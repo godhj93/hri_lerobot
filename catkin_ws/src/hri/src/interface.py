@@ -185,7 +185,6 @@ class SimulatedRobot:
         jac = np.vstack([jacp, jacr])
 
         # Orientation error.
-        print(site_quat, ee_rot, site_target_quat, ee_target_rot)
         mujoco.mju_mat2Quat(site_quat, ee_rot)
         mujoco.mju_mat2Quat(site_target_quat, ee_target_rot)
 
@@ -209,4 +208,6 @@ class SimulatedRobot:
 
         # Step the simulation.
         mujoco.mj_step(self.m, self.d)
+        
+    
 
