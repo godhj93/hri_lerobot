@@ -27,19 +27,48 @@ if __name__ == '__main__':
 
     # Initialize the robot position
     # Note: 나중에 로봇에 전원 인가 시 해당 위치로 초기화하는 것 추가해야함 [Not implemented]
-    data.qpos[0] = 0.0
-    data.qpos[1] = 0.0
-    data.qpos[2] = 0.0
-    mujoco.mj_forward(world, data)
 
     # Desired real-time frame rate
     # Note: 시뮬레이션에서만 필요한 것으로 나중에 로봇 탑재 시 불필요함
     frame_duration = 1.0 / 60  
 
     # Define target end-effector position
-    # Note: ROS를 이용해서 간단한 제어가 가능한지 확인 [Not implemented]
-    robot.target_ee_position = np.array([0.0, 0.0, 0.0])  # x, y, z 목표 위치
-
+    # Note: ROS를 이용해서 간단한 제어가 가능한지 확인 [O]
+    x_goal1 = np.linspace(0.0, 0.0, 100)
+    y_goal1 = np.linspace(0.1, 0.4, 100)
+    z_goal1 = np.linspace(0.1, 0.1, 100)
+    
+    x_goal2 = np.linspace(0.0, 0.0, 100)
+    y_goal2 = np.linspace(0.4, 0.4, 100)
+    z_goal2 = np.linspace(0.1, 0.1, 100)
+    
+    x_goal3 = np.linspace(0.0, 0.3, 100)
+    y_goal3 = np.linspace(0.2, 0.2, 100)
+    z_goal3 = np.linspace(0.1, 0.1, 100)
+    
+    x_goal4 = np.linspace(0.3, 0.0, 100)
+    y_goal4 = np.linspace(0.2, 0.2, 100)
+    z_goal4 = np.linspace(0.1, 0.1, 100)
+    
+    x_goal5 = np.linspace(0.0, -0.3, 100)
+    y_goal5 = np.linspace(0.2, 0.2, 100)
+    z_goal5 = np.linspace(0.1, 0.1, 100)
+    
+    x_goal6 = np.linspace(-0.3, 0.0, 100)
+    y_goal6 = np.linspace(0.2, 0.2, 100)
+    z_goal6 = np.linspace(0.1, 0.1, 100)
+    
+    x_goal = np.concatenate((x_goal1, x_goal2, x_goal3, x_goal4, x_goal5))
+    y_goal = np.concatenate((y_goal1, y_goal2, y_goal3, y_goal4, y_goal5))
+    z_goal = np.concatenate((z_goal1, z_goal2, z_goal3, z_goal4, z_goal5))
+    
+    i=0
+    data.qpos[:] = np.array([x_goal[i], y_goal[i], z_goal[i], 0, 0, 0])
+    
+    mujoco.mj_forward(world, data)
+    
+    robot.target_ee_position = np.array([x_goal[i], y_goal[i], z_goal[i]])
+    print(robot.target_ee_position )
     # Initialize ROS
     rospy.init_node('robot_interface', anonymous=True)
     rospy.Subscriber('target_position', Float32MultiArray, callback)
@@ -48,7 +77,7 @@ if __name__ == '__main__':
 
     # Create and Initialize Marker for trajectory
     trajectory_marker = create_marker_traj()
-
+    
     with mujoco.viewer.launch_passive(world, data) as viewer:
         while viewer.is_running():
             
@@ -59,8 +88,26 @@ if __name__ == '__main__':
                 ee_target_rot = fix_joint_angle(), 
                 joint_name = 'joint6')
             
-            # 관절 위치를 목표로 설정
-            robot.set_target_pos(target_joint_positions)
+            
+            if target_joint_positions is not None:
+            #     # Simple PID Contoller
+            #     kp = 1.0
+                
+            #     # read current joint positions
+            #     current_joint_positions = robot.read_ee_pos(joint_name='joint6')
+                
+            #     # calculate error
+            #     print(f"Target: {target_joint_positions}, Current: {current_joint_positions}")
+            #     error = target_joint_positions - current_joint_positions
+                
+            #     # calculate control signal
+            #     control_signal = kp * error
+                
+            #     # set control signal
+            #     target_joint_positions = current_joint_positions + control_signal
+                
+                # 관절 위치를 목표로 설정
+                robot.set_target_pos(target_joint_positions)
 
             # 시뮬레이션 한 스텝 전진
             mujoco.mj_step(world, data)
@@ -74,9 +121,12 @@ if __name__ == '__main__':
             point.z = current_ee_position[2]
             trajectory_marker.points.append(point)
             marker_pub.publish(trajectory_marker)
-
+            
             if np.linalg.norm(current_ee_position - robot.target_ee_position) < 1e-1:
+                i += 1
+                robot.target_ee_position = np.array([x_goal[i], y_goal[i], z_goal[i]])
                 print("Target reached!")
+                # time.sleep(1)
                 # break
             
             # Synchronize with the viewer
