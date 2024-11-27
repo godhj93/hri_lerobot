@@ -1,6 +1,8 @@
 import numpy as np
 import mujoco
 from termcolor import colored
+import rospy
+from visualization_msgs.msg import Marker
 
 def load_world(world_path = 'low_cost_robot/scene.xml'):
         
@@ -36,3 +38,21 @@ def fix_joint_angle():
     rot = calculate_target_rotation()
     return rot.flatten()
 
+def create_marker_traj(ns = "joint6_trajectory"):
+    
+        trajectory_marker = Marker()
+        trajectory_marker.header.frame_id = "world"  # Replace with your Fixed Frame
+        trajectory_marker.header.stamp = rospy.Time.now()
+        trajectory_marker.ns = ns
+        trajectory_marker.id = 0
+        trajectory_marker.type = Marker.LINE_STRIP  # Type for trajectory
+        trajectory_marker.action = Marker.ADD
+        trajectory_marker.scale.x = 0.01  # Line width
+        trajectory_marker.color.a = 1.0  # Transparency
+        trajectory_marker.color.r = 1.0  # Red
+        trajectory_marker.color.g = 0.0
+        trajectory_marker.color.b = 0.0
+        trajectory_marker.pose.orientation.w = 1.0
+        
+        return trajectory_marker
+    

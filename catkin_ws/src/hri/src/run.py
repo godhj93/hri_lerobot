@@ -2,12 +2,14 @@ import numpy as np
 import mujoco
 import mujoco.viewer
 from interface import SimulatedRobot
-from utils import load_world, fix_joint_angle
+from utils import load_world, fix_joint_angle, create_marker_traj
 import time
 
 # ROS 
 import rospy
 from std_msgs.msg import Float32MultiArray
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import Point
 
 def callback(data):
     # target_ee_position = data
@@ -41,13 +43,21 @@ if __name__ == '__main__':
     # Initialize ROS
     rospy.init_node('robot_interface', anonymous=True)
     rospy.Subscriber('target_position', Float32MultiArray, callback)
+    # Publisher for joint6 position visualization
+    marker_pub = rospy.Publisher('joint6_trajectory', Marker, queue_size=10)
+
+    # Create and Initialize Marker for trajectory
+    trajectory_marker = create_marker_traj()
 
     with mujoco.viewer.launch_passive(world, data) as viewer:
         while viewer.is_running():
             
             step_start = time.time()
             
-            target_joint_positions = robot.inverse_kinematics_rot_backup(ee_target_pos = robot.target_ee_position, ee_target_rot = fix_joint_angle(), joint_name = 'joint6')
+            target_joint_positions = robot.inverse_kinematics_rot_backup(
+                ee_target_pos = robot.target_ee_position, 
+                ee_target_rot = fix_joint_angle(), 
+                joint_name = 'joint6')
             
             # 관절 위치를 목표로 설정
             robot.set_target_pos(target_joint_positions)
@@ -55,9 +65,16 @@ if __name__ == '__main__':
             # 시뮬레이션 한 스텝 전진
             mujoco.mj_step(world, data)
 
-            # 현재 말단 조작기 위치 출력
+            # Read the ee position to visualize in RViz
             current_ee_position = robot.read_ee_pos(joint_name='joint6')
-            print()
+            
+            point = Point()
+            point.x = current_ee_position[0]
+            point.y = current_ee_position[1]
+            point.z = current_ee_position[2]
+            trajectory_marker.points.append(point)
+            marker_pub.publish(trajectory_marker)
+
             if np.linalg.norm(current_ee_position - robot.target_ee_position) < 1e-1:
                 print("Target reached!")
                 # break
