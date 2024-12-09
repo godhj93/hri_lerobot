@@ -12,9 +12,13 @@ import rospy
 from std_msgs.msg import Float32MultiArray
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Point
+from termcolor import colored
 
-# for callback to use robot.target_ee_position
-robot = None
+# REAL ROBOT
+from robot import Robot
+from utils import radian2pwm, pwm2radian, initialize_real_robot, clock
+
+
 
 # printing frequency
 printing_freq = 500
@@ -46,35 +50,39 @@ def callback(data):
 '''
 
 def callback(data):
-    global target_queue, robot
     
-    # 새로 받은 데이터
-    new_point = np.array(data.data)
+    robot.target_ee_position = np.array(data.data)
+    '''Original Code'''
+    # global target_queue, robot
+    
+    # # 새로 받은 데이터
+    # new_point = np.array(data.data)
 
-    # 큐의 마지막 포인트 가져오기
-    if not target_queue.empty():
-        last_point = target_queue.queue[-1]
-    else:
-        # if robot == None: return
-        try:
-            last_point = robot.target_ee_position
-        except:
-            return
+    # # 큐의 마지막 포인트 가져오기
+    # if not target_queue.empty():
+    #     last_point = target_queue.queue[-1]
+    # else:
+    #     # if robot == None: return
+    #     try:
+    #         last_point = robot.target_ee_position
+    #     except:
+    #         return
 
-    # 두 점 사이의 거리 계산
-    distance = np.linalg.norm(new_point - last_point)
+    # # 두 점 사이의 거리 계산
+    # distance = np.linalg.norm(new_point - last_point)
 
-    if distance > DRAWING_POINT_DIST:
-        # 두 점 사이를 짧은 간격으로 보간
-        num_interpolated_points = int(np.ceil(distance / DRAWING_POINT_DIST))
-        interpolated_points = np.linspace(last_point, new_point, num_interpolated_points, endpoint=False)
-        # 보간된 점들을 큐에 추가
-        for point in interpolated_points[1:]:  # 첫 점은 이미 큐에 있으므로 제외
-            target_queue.put(point)
-            print(f"Interpolated point added to queue: {point}")
+    # if distance > DRAWING_POINT_DIST:
+    #     # 두 점 사이를 짧은 간격으로 보간
+    #     num_interpolated_points = int(np.ceil(distance / DRAWING_POINT_DIST))
+    #     print(num_interpolated_points)
+    #     interpolated_points = np.linspace(last_point, new_point, num_interpolated_points, endpoint=False)
+    #     # 보간된 점들을 큐에 추가
+    #     for point in interpolated_points[1:]:  # 첫 점은 이미 큐에 있으므로 제외
+    #         target_queue.put(point)
+    #         print(f"Interpolated point added to queue: {point}")
 
-    target_queue.put(new_point)
-    print(f"New target added to queue: {new_point}")
+    # target_queue.put(new_point)
+    # print(f"New target added to queue: {new_point}")
 
 if __name__ == '__main__':
     last_printed_time = time.time()
@@ -82,7 +90,7 @@ if __name__ == '__main__':
     # Set up signal handling for Ctrl+C
     signal.signal(signal.SIGINT, signal_handler)
 
-    print("Hello, Mujoco!")
+    print(colored(f"Starting the simulation...", 'green'))
 
     # Define World, Robot, and Data
     world, data = load_world()
@@ -98,7 +106,7 @@ if __name__ == '__main__':
     mujoco.mj_forward(world, data)
 
     # Desired real-time frame rate
-    frame_duration = 1.0 / 60  
+    frame_duration = 1.0 / 30  
 
     # Initialize ROS
     rospy.init_node('robot_interface', anonymous=True)
@@ -111,8 +119,11 @@ if __name__ == '__main__':
     drawing_marker = create_marker_traj()
 
     # Initialize target position
-    robot.target_ee_position = np.array([0.1, 0.1, 0.2])  # 초기 목표 위치
+    robot.target_ee_position = np.array([0.0, 0.3, 0.1])  # 초기 목표 위치
 
+    # Initialize real robot
+    real_robot = initialize_real_robot(world)
+    
     with mujoco.viewer.launch_passive(world, data) as viewer:
         try:
             while viewer.is_running() and not shutdown_flag:
@@ -124,16 +135,19 @@ if __name__ == '__main__':
                     robot.target_ee_position = target_queue.get()  # 큐에서 새로운 목표 가져오기
                     print(f"Processing new target: {robot.target_ee_position}")
                     # a = input("OK?")
-
                 # Calculate the joint positions for the target position
-                robot.inverse_kinematics_rot_backup_5DOF(
+                
+                target_radian = robot.inverse_kinematics_rot_backup_6DOF(
                     ee_target_pos=robot.target_ee_position, 
                     ee_target_rot=fix_joint_angle(), 
-                    joint_name='joint5')
+                    joint_name='joint6')
+                
+                print(colored(f"Target joint position: {np.round(target_radian, 2)}", 'red'))
 
                 # Read the end-effector position to visualize in RViz
-                current_ee_position = robot.read_ee_pos(joint_name='joint5')
-
+                current_ee_position = robot.read_ee_pos(joint_name='joint6')
+                print(colored(f"{current_ee_position}", 'blue'))    
+                
                 point = Point()
                 point.x = current_ee_position[0]
                 point.y = current_ee_position[1]
@@ -159,8 +173,6 @@ if __name__ == '__main__':
                     drawing_marker.color.a = 1.0
                 drawing_marker_pub.publish(drawing_marker)
 
-
-
                 # Print out current status
                 if time.time() > last_printed_time + 1/printing_freq:
                     last_printed_time = time.time()
@@ -184,7 +196,25 @@ if __name__ == '__main__':
                     print(f"Current target queue size: {target_queue.qsize()}")
                     print()
 
+                
+                real_robot._set_position_control()
+                real_robot._enable_torque()
+                # target_pwm = degree2pwm(np.array([0, 0, 0, 45]))
+                target_pwm = radian2pwm(np.array(target_radian[:4]))
+                current_pwm = real_robot.read_position()
+                
+                smooth_mover = np.linspace(current_pwm, target_pwm, 2000)
+                step_start = time.time()
+                
+                for pwm in smooth_mover:
+                    real_robot.set_goal_pos([int(p) for p in pwm])
+                    step_start = clock(step_start, world)
+                
+                
                 # Synchronize with the viewer
+                current_position = np.array(real_robot.read_position())
+                data.qpos[:4] = robot._pwm2pos(current_position)
+                mujoco.mj_step(world, data)
                 viewer.sync()
 
                 # Calculate elapsed time for this step

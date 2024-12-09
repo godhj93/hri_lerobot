@@ -1,6 +1,6 @@
 import mujoco
 import numpy as np
-
+from termcolor import colored
 
 class SimulatedRobot:
     def __init__(self, m, d) -> None:
@@ -155,7 +155,7 @@ class SimulatedRobot:
         # 시뮬레이션 스텝 진행
         mujoco.mj_step(self.m, self.d)
 
-    def inverse_kinematics_rot_backup(self, ee_target_pos, ee_target_rot, rate=0.2, joint_name='end_effector'):
+    def inverse_kinematics_rot_backup_6DOF(self, ee_target_pos, ee_target_rot, rate=0.2, joint_name='end_effector'):
         """
         :param ee_target_pos: numpy array of target end effector position
         :param joint_name: name of the end effector joint
@@ -206,8 +206,127 @@ class SimulatedRobot:
         np.clip(q[:6], *self.m.jnt_range.T[:, :6], out=q[:6])
         self.d.ctrl[:6] = q[:6]
 
+        print(colored(f"Target joint position: {np.round(q[:6], 2)}", 'red'))
         # Step the simulation.
         mujoco.mj_step(self.m, self.d)
         
+        return self.d.ctrl[:6]
     
 
+    def inverse_kinematics_rot_backup_5DOF(self, ee_target_pos, ee_target_rot, rate=0.2, joint_name='end_effector'):
+        """
+        :param ee_target_pos: numpy array of target end effector position
+        :param joint_name: name of the end effector joint
+        """
+        joint_id = self.m.body(joint_name).id
+
+        # get the current end effector position
+        ee_pos = self.d.geom_xpos[joint_id]
+        ee_rot = self.d.geom_xmat[joint_id]
+        error = np.zeros(6)
+        error_pos = error[:3]
+        error_rot = error[3:]
+        site_quat = np.zeros(4)
+        site_target_quat = np.zeros(4)
+        site_quat_conj = np.zeros(4)
+        error_quat = np.zeros(4)
+
+        diag = 1e-4 * np.identity(5)
+        integration_dt = 1.0
+
+        # compute the jacobian
+        jacp = np.zeros((3, self.m.nv))
+        jacr = np.zeros((3, self.m.nv))
+        mujoco.mj_jacBodyCom(self.m, self.d, jacp, jacr, joint_id)
+        
+        # compute target joint velocities
+        jac = np.vstack([jacp, jacr])
+
+        # Orientation error.
+        mujoco.mju_mat2Quat(site_quat, ee_rot)
+        mujoco.mju_mat2Quat(site_target_quat, ee_target_rot)
+
+        mujoco.mju_negQuat(site_quat_conj, site_quat)
+
+        mujoco.mju_mulQuat(error_quat, site_target_quat, site_quat_conj)
+
+        mujoco.mju_quat2Vel(error_rot, error_quat, 1.0)
+
+        error_pos = ee_target_pos - ee_pos
+        error = np.hstack([error_pos, error_rot])
+        
+        dq = jac[:5, :5].T @ np.linalg.solve(jac[:5, :5] @ jac[:5, :5].T + diag, error[:5])
+
+        q = self.d.qpos.copy()
+        mujoco.mj_integratePos(self.m, q, dq, integration_dt)
+
+        # Set the control signal.
+        np.clip(q[:5], *self.m.jnt_range.T[:, :5], out=q[:5])
+        self.d.ctrl[:5] = q[:5]
+
+        print(colored(f"Target joint position: {np.round(q[:5], 2)}", 'red'))
+        # Step the simulation.
+        mujoco.mj_step(self.m, self.d)
+        
+        return self.d.ctrl[:5]
+    
+
+    
+
+    def inverse_kinematics_rot_backup_4DOF(self, ee_target_pos, ee_target_rot, rate=0.2, joint_name='end_effector'):
+        """
+        :param ee_target_pos: numpy array of target end effector position
+        :param joint_name: name of the end effector joint
+        """
+        joint_id = self.m.body(joint_name).id
+
+        # get the current end effector position
+        ee_pos = self.d.geom_xpos[joint_id]
+        ee_rot = self.d.geom_xmat[joint_id]
+        error = np.zeros(6)
+        error_pos = error[:3]
+        error_rot = error[3:]
+        site_quat = np.zeros(4)
+        site_target_quat = np.zeros(4)
+        site_quat_conj = np.zeros(4)
+        error_quat = np.zeros(4)
+
+        diag = 1e-4 * np.identity(4)
+        integration_dt = 1.0
+
+        # compute the jacobian
+        jacp = np.zeros((3, self.m.nv))
+        jacr = np.zeros((3, self.m.nv))
+        mujoco.mj_jacBodyCom(self.m, self.d, jacp, jacr, joint_id)
+        
+        # compute target joint velocities
+        jac = np.vstack([jacp, jacr])
+
+        # Orientation error.
+        mujoco.mju_mat2Quat(site_quat, ee_rot)
+        mujoco.mju_mat2Quat(site_target_quat, ee_target_rot)
+
+        mujoco.mju_negQuat(site_quat_conj, site_quat)
+
+        mujoco.mju_mulQuat(error_quat, site_target_quat, site_quat_conj)
+
+        mujoco.mju_quat2Vel(error_rot, error_quat, 1.0)
+
+        error_pos = ee_target_pos - ee_pos
+        error = np.hstack([error_pos, error_rot])
+        
+        dq = jac[:4, :4].T @ np.linalg.solve(jac[:4, :4] @ jac[:4, :4].T + diag, error[:4])
+
+        q = self.d.qpos.copy()
+        mujoco.mj_integratePos(self.m, q, dq, integration_dt)
+
+        # Set the control signal.
+        np.clip(q[:4], *self.m.jnt_range.T[:, :4], out=q[:4])
+        self.d.ctrl[:4] = q[:4]
+
+        print(colored(f"Target joint position: {np.round(q[:4], 2)}", 'red'))
+        # Step the simulation.
+        mujoco.mj_step(self.m, self.d)
+        
+        return self.d.ctrl[:4]
+    

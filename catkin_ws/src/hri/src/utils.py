@@ -3,7 +3,8 @@ import mujoco
 from termcolor import colored
 import rospy
 from visualization_msgs.msg import Marker
-
+import time
+from robot import Robot
 def load_world(world_path = 'low_cost_robot/scene.xml'):
         
     # Load world and data
@@ -56,3 +57,79 @@ def create_marker_traj(ns = "joint6_trajectory"):
         
         return trajectory_marker
     
+
+def degree2pwm(degree: np.ndarray) -> np.ndarray:
+  '''
+  origin_pwm은 모터 기준 0도에 해당하는 pwm 값
+  degree는 0~45도 사이의 각도
+  '''
+  if type(degree) == list:
+    degree = np.array(degree)
+    
+  origin_pwm = 2048
+  pwm = origin_pwm + degree * 500 / 45
+  
+  return pwm
+
+def radian2pwm(radian: np.ndarray) -> np.ndarray:
+  
+  degree = radian * 180 / np.pi
+  pwm = degree2pwm(degree)
+  
+  return pwm
+
+def pwm2degree(pwm: np.ndarray) -> np.ndarray: 
+    '''
+    origin_pwm은 모터 기준 0도에 해당하는 pwm 값
+    degree는 0~45도 사이의 각도
+    '''
+    if type(pwm) == list:
+        pwm = np.array(pwm)
+        
+    origin_pwm = 2048
+    degree = (pwm - origin_pwm) * 45 / 500
+    
+    return degree
+
+def pwm2radian(pwm: np.ndarray) -> np.ndarray:
+  
+  degree = pwm2degree(pwm)
+  radian = degree * np.pi / 180
+  
+  return radian
+
+def clock(step_start, m):
+    time_until_next_step = m.opt.timestep - (time.time() - step_start)
+    if time_until_next_step > 0:
+        time.sleep(time_until_next_step)
+        return time.time()
+    
+    else:
+        # print(colored("Warning: Simulation is running slower than real time!", 'red'))
+        return time.time()
+    
+# Connect to the real robot
+def initialize_real_robot(world):
+    robot_real = Robot(device_name='/dev/ttyACM0')
+    print(colored("Real Robot Connected!", 'green'))
+
+    # m = mujoco.MjModel.from_xml_path('low_cost_robot/scene.xml')
+
+    # Set the robot to initial position
+    robot_real._set_position_control()
+    robot_real._enable_torque()
+
+    ### Initialize the robot_real position
+    qpos0 = np.array(robot_real.read_position())
+    init_pos = radian2pwm(np.array([0, 0, 0, 0]))
+    smooth_mover = np.linspace(qpos0, init_pos, 1000)
+
+    step_start = time.time()
+    for revert_pos in smooth_mover:
+        robot_real.set_goal_pos([int(p) for p in revert_pos])
+        step_start = clock(step_start, world)
+
+    print(colored(f"robot_real is initialized to {pwm2radian(init_pos)}, current position: {pwm2radian(robot_real.read_position())}", 'green'))
+    robot_real._disable_torque()
+    
+    return robot_real
