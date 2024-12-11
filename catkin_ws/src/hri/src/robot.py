@@ -226,6 +226,14 @@ class Robot:
             self.dynamixel.set_operating_mode(motor_id, OperatingMode.VELOCITY)
         # self._enable_torque()
         self.motor_control_state = MotorControlType.VELOCITY_CONTROL
+    
+    def radian_to_dynamixel(self, radian):
+        """
+        라디안을 Dynamixel의 엔코더 값으로 변환.
+        :param radian: 라디안 값
+        :return: 엔코더 값 (0 ~ 4096)
+        """
+        return int((radian / (2 * np.pi)) * 4096)
 
 if __name__ == "__main__":
     robot = Robot(device_name='/dev/ttyACM0')

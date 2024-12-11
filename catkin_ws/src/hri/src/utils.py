@@ -123,7 +123,7 @@ def initialize_real_robot(world):
 
     ### Initialize the robot_real position
     qpos0 = np.array(robot_real.read_position())
-    init_pos = radian2pwm(np.array([0, 0, 0, 0]))
+    init_pos = radian2pwm(np.array([-0, +0, -0, +0])) # CCW, CW, CCW, CW
     smooth_mover = np.linspace(qpos0, init_pos, 1000)
 
     step_start = time.time()

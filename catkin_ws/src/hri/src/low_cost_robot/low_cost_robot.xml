@@ -61,9 +61,9 @@
                                 <joint name="joint5" class="joint5"/>
                                 <geom pos="0 -0.125 -0.163" type="mesh" name="joint5-pt1" mesh="gripper-static-motor-pt1" rgba="0.1 0.1 0.1 1"/>
                                 <geom pos="0 -0.125 -0.163" type="mesh" name="joint5" mesh="gripper-static-motor-pt2" rgba="0.1 0.1 0.1 1" contype="0" conaffinity="0"/>
-                                <body name="joint5-pad">
+                                <!-- <body name="joint5-pad">
                                     <geom type="box" condim="3" friction="0.7" mass="0.01" solimp="0.95 0.99 0.001" solref="0.004 1" name="static_finger_pad" size="0.006 0.006 0.006" pos="0.0135 0.07 0.0" priority="1" rgba="0 0 0.8 0"/>
-                                </body>
+                                </body> -->
 
                                 <!-- <body name="joint6" pos="0 0 0">
                                     <joint pos="-0.009 0.0165 0" name="joint6" class="joint6"/>
