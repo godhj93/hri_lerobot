@@ -10,8 +10,8 @@ PLOT_RESULT = True
 
 X_MIN_BOUND = -0.06
 X_MAX_BOUND = 0.06
-Y_MIN_BOUND = 0.18
-Y_MAX_BOUND = 0.30 # 0.35
+Y_MIN_BOUND = 0.25
+Y_MAX_BOUND = 0.30
 Z_MIN_BOUND = 0.051
 Z_MAX_BOUND = 0.1
 
@@ -79,8 +79,7 @@ def publish_target_positions(csv_file, topic_name='/target_position', interval=1
 
     # 첫 세 열 추출 (x, y, z)
     positions = data.iloc[:, :3].values
-    print(positions)
-    # raise ValueError()
+
     if PLOT_RESULT: plot_points(positions, 'generated points')
 
     # normalize to configuration space
@@ -115,7 +114,6 @@ def publish_target_positions(csv_file, topic_name='/target_position', interval=1
 if __name__ == "__main__":
     # CSV 파일 경로
     csv_file_path = 'test.csv'
-    # csv_file_path = 'circle_points.csv'
 
     # 퍼블리시 실행
     publish_target_positions(csv_file_path, interval=0.1)

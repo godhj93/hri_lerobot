@@ -69,7 +69,7 @@ def degree2pwm(degree: np.ndarray) -> np.ndarray:
     degree = np.array(degree)
     
   origin_pwm = 2048
-  pwm = origin_pwm + degree * 500 / 45
+  pwm = origin_pwm + degree * (4096/360.0)
   
   return pwm
 
@@ -89,7 +89,7 @@ def pwm2degree(pwm: np.ndarray) -> np.ndarray:
         pwm = np.array(pwm)
         
     origin_pwm = 2048
-    degree = (pwm - origin_pwm) * 45 / 500
+    degree = (pwm - origin_pwm) * (360.0 / 4096.0)
     
     return degree
 

@@ -107,8 +107,10 @@ if __name__ == '__main__':
     drawing_marker_pub_4 = rospy.Publisher('drawing_trajectory_4', Marker, queue_size=10)
     drawing_marker_pub_5 = rospy.Publisher('drawing_trajectory_5', Marker, queue_size=10)
     drawing_marker_pub_6 = rospy.Publisher('drawing_trajectory_6', Marker, queue_size=10)
+    target_trajectory_pub = rospy.Publisher('target_trajectory', Marker, queue_size=10)
 
     # Create and Initialize Marker for trajectory
+    target_trajectory_marker = create_marker_traj()
     trajectory_marker = create_marker_traj()
     drawing_marker4 = create_marker_traj()
     drawing_marker5 = create_marker_traj()
@@ -160,6 +162,11 @@ if __name__ == '__main__':
                 # point6.y = current_ee_position6[1]
                 # point6.z = current_ee_position6[2]
 
+                target_pts = Point()
+                target_pts.x = robot.target_ee_position[0]
+                target_pts.y = robot.target_ee_position[1]
+                target_pts.z = robot.target_ee_position[2]
+                
                 if point4.z < DRAWING_Z:
                     
                     # print(colored("Drawing trajectory 4. Skipped it.", 'yellow'))
@@ -199,6 +206,17 @@ if __name__ == '__main__':
                 #     drawing_marker6.color.a = 1.0
                 #     drawing_marker_pub_6.publish(drawing_marker6)
 
+                if target_pts.z < DRAWING_Z:
+                    target_trajectory_marker.points.append(target_pts)
+                    target_trajectory_marker.scale.x = 0.001
+                    target_trajectory_marker.scale.y = 0.001
+                    target_trajectory_marker.scale.z = 0.001
+                    target_trajectory_marker.color.r = 1.0
+                    target_trajectory_marker.color.g = 1.0
+                    target_trajectory_marker.color.b = 1.0
+                    target_trajectory_marker.color.a = 1.0
+                    target_trajectory_pub.publish(target_trajectory_marker)
+                    
                 # Print out current status
                 if time.time() > last_printed_time + 1/printing_freq:
                     last_printed_time = time.time()

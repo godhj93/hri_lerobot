@@ -159,22 +159,22 @@ if __name__ == '__main__':
                 
                 current_position = np.array(real_robot.read_position())
 
-                # smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], 100)
+                # smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:5], 100)
                 if initialized_flag == False: 
-                    smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], 100)
+                    smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:5], 100)
                     print("initalized")
                     initialized_flag = True
                 else:
                     if robot.target_ee_position[-1] > DRAWING_Z * 1.001:
-                        smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], 100)
+                        smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:5], 100)
                         z_up_flag = True
                         print(colored(f"robot pos: {robot.target_ee_position[-1]}, smooth mover : {2000}", 'green'))
                     elif z_up_flag:
-                        smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], 1000)
+                        smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:5], 1000)
                         z_up_flag = False
                         print(colored(f"smooth mover : {1000}", 'blue'))
                     else:
-                        smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], INTERPOLATING_NUM)
+                        smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:5], INTERPOLATING_NUM)
                         print(colored(f"smooth mover : {INTERPOLATING_NUM}", 'red'))
                 
                 step_start = time.time()
@@ -184,12 +184,12 @@ if __name__ == '__main__':
                 
                     # Update the simulation with the real robot's joint positions
                     current_position = np.array(real_robot.read_position())
-                    data.qpos[:4] = robot._pwm2pos(current_position)
+                    data.qpos[:5] = robot._pwm2pos(current_position)
                     # 로봇에 대한 관절각도 radian을 업데이트함
                     mujoco.mj_step(robot.m, data)
                     viewer.sync()
                     
-                print(colored(f"Finsihed moving to {radian2pwm(target_radian)[:4]}", 'red'))
+                print(colored(f"Finsihed moving to {radian2pwm(target_radian)[:5]}", 'red'))
                 if time.time() - last_debug_time > 1:
                     last_debug_time = time.time()
                     
