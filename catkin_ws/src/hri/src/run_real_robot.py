@@ -144,6 +144,7 @@ if __name__ == '__main__':
                     # a = input("OK?")
 
                 # Calculate the joint positions for the target position
+                
                 target_radian = robot.inverse_kinematics_rot_backup_5DOF(
                     ee_target_pos=robot.target_ee_position, 
                     ee_target_rot=fix_joint_angle(), 
@@ -151,7 +152,7 @@ if __name__ == '__main__':
                 
                 current_position = np.array(real_robot.read_position())
 
-                smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], 100)
+                smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], 10)
                 
                 step_start = time.time()
                 for pwm in smooth_mover:
