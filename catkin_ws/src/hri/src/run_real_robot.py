@@ -35,7 +35,7 @@ let_it_go_thre = 1.0
 
 DRAWING_Z = 0.07
 DRAWING_POINT_DIST = 0.001
-
+INTERPOLATING_NUM = 10
 def signal_handler(signum, frame):
     global shutdown_flag
     shutdown_flag = True
@@ -49,6 +49,9 @@ def callback(data):
 '''
 
 def callback(data):
+    
+    # robot.target_ee_position = np.array(data.data)
+    '''Original Code'''
     global target_queue, robot
     
     # 새로 받은 데이터
@@ -64,20 +67,22 @@ def callback(data):
         except:
             return
 
-    # # # 두 점 사이의 거리 계산
-    # distance = np.linalg.norm(new_point - last_point)
+    # 두 점 사이의 거리 계산
+    distance = np.linalg.norm(new_point - last_point)
 
-    # if distance > DRAWING_POINT_DIST:
-    #     # 두 점 사이를 짧은 간격으로 보간
-    #     num_interpolated_points = 1000#int(np.ceil(distance / DRAWING_POINT_DIST))
-    #     interpolated_points = np.linspace(last_point, new_point, num_interpolated_points, endpoint=False)
-    #     # 보간된 점들을 큐에 추가
-    #     for point in interpolated_points[1:]:  # 첫 점은 이미 큐에 있으므로 제외
-    #         target_queue.put(point)
-    #         print(f"Interpolated point added to queue: {point}")
+    if distance > DRAWING_POINT_DIST:
+        # 두 점 사이를 짧은 간격으로 보간
+        num_interpolated_points = int(np.ceil(distance / DRAWING_POINT_DIST))
+        print(num_interpolated_points)
+        interpolated_points = np.linspace(last_point, new_point, num_interpolated_points, endpoint=False)
+        # 보간된 점들을 큐에 추가
+        for point in interpolated_points[1:]:  # 첫 점은 이미 큐에 있으므로 제외
+            target_queue.put(point)
+            print(f"Interpolated point added to queue: {point}")
 
     target_queue.put(new_point)
     print(f"New target added to queue: {new_point}")
+
 
 if __name__ == '__main__':
     last_printed_time = time.time()
@@ -110,8 +115,9 @@ if __name__ == '__main__':
     drawing_marker_pub_4 = rospy.Publisher('drawing_trajectory_4', Marker, queue_size=10)
     drawing_marker_pub_5 = rospy.Publisher('drawing_trajectory_5', Marker, queue_size=10)
     drawing_marker_pub_6 = rospy.Publisher('drawing_trajectory_6', Marker, queue_size=10)
-
+    target_trajectory_pub = rospy.Publisher('target_trajectory', Marker, queue_size=10)
     # Create and Initialize Marker for trajectory
+    target_trajectory_marker = create_marker_traj()
     trajectory_marker = create_marker_traj()
     drawing_marker4 = create_marker_traj()
     drawing_marker5 = create_marker_traj()
@@ -129,6 +135,7 @@ if __name__ == '__main__':
     real_robot = Robot(device_name='/dev/ttyACM0')
     real_robot._enable_torque()
     real_robot._set_position_control()
+    initialized_flag = False
     
     last_debug_time = time.time()
     with mujoco.viewer.launch_passive(world, data) as viewer:
@@ -152,19 +159,36 @@ if __name__ == '__main__':
                 
                 current_position = np.array(real_robot.read_position())
 
-                smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], 10)
+                # smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], 100)
+                if initialized_flag == False: 
+                    smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], 100)
+                    print("initalized")
+                    initialized_flag = True
+                else:
+                    if robot.target_ee_position[-1] > DRAWING_Z * 1.001:
+                        smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], 100)
+                        z_up_flag = True
+                        print(colored(f"robot pos: {robot.target_ee_position[-1]}, smooth mover : {2000}", 'green'))
+                    elif z_up_flag:
+                        smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], 1000)
+                        z_up_flag = False
+                        print(colored(f"smooth mover : {1000}", 'blue'))
+                    else:
+                        smooth_mover = np.linspace(current_position, radian2pwm(target_radian)[:4], INTERPOLATING_NUM)
+                        print(colored(f"smooth mover : {INTERPOLATING_NUM}", 'red'))
                 
                 step_start = time.time()
                 for pwm in smooth_mover:
                     real_robot.set_goal_pos([int(p) for p in pwm])
                     step_start = clock(step_start, world)
                 
-                 # Update the simulation with the real robot's joint positions
+                    # Update the simulation with the real robot's joint positions
                     current_position = np.array(real_robot.read_position())
                     data.qpos[:4] = robot._pwm2pos(current_position)
                     # 로봇에 대한 관절각도 radian을 업데이트함
                     mujoco.mj_step(robot.m, data)
                     viewer.sync()
+                    
                 print(colored(f"Finsihed moving to {radian2pwm(target_radian)[:4]}", 'red'))
                 if time.time() - last_debug_time > 1:
                     last_debug_time = time.time()
@@ -197,7 +221,10 @@ if __name__ == '__main__':
                 # point6.x = current_ee_position6[0]
                 # point6.y = current_ee_position6[1]
                 # point6.z = current_ee_position6[2]
-
+                target_pts = Point()
+                target_pts.x = robot.target_ee_position[0]
+                target_pts.y = robot.target_ee_position[1]
+                target_pts.z = robot.target_ee_position[2]
                 if point4.z < DRAWING_Z:
                     
                     # print(colored("Drawing trajectory 4. Skipped it.", 'yellow'))
@@ -237,6 +264,17 @@ if __name__ == '__main__':
                 #     drawing_marker6.color.a = 1.0
                 #     drawing_marker_pub_6.publish(drawing_marker6)
 
+                if target_pts.z < DRAWING_Z:
+                    target_trajectory_marker.points.append(target_pts)
+                    target_trajectory_marker.scale.x = 0.001
+                    target_trajectory_marker.scale.y = 0.001
+                    target_trajectory_marker.scale.z = 0.001
+                    target_trajectory_marker.color.r = 1.0
+                    target_trajectory_marker.color.g = 1.0
+                    target_trajectory_marker.color.b = 1.0
+                    target_trajectory_marker.color.a = 1.0
+                    target_trajectory_pub.publish(target_trajectory_marker)
+                    
                 # Print out current status
                 if time.time() > last_printed_time + 1/printing_freq:
                     last_printed_time = time.time()
@@ -244,7 +282,7 @@ if __name__ == '__main__':
                     # rospy.loginfo(f"{current_ee_position5 - robot.target_ee_position}")
                     # print(f"Target ee position:  [{np.round(robot.target_ee_position, 2)}]")
                     # print(f"Current ee position: [{np.round(point6.x, 2)}, {np.round(point6.y, 2)}, {np.round(point6.z)}]")
-                if np.linalg.norm(current_ee_position5 - robot.target_ee_position) < 1e-1: #5e-2:
+                if np.linalg.norm(current_ee_position5 - robot.target_ee_position) < 5e-2:
                     prev_target_reached = True
                     prev_reached_time = time.time()
                     # rospy.loginfo("Target reached...!")
