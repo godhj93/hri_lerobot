@@ -12,9 +12,9 @@ class SimulatedRobot:
         self.d = d
 
         # PID gains for 6D error (3D position + 3D orientation)
-        self.Kp = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0]) * 5
-        self.Ki = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1]) * 1.0
-        self.Kd = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1]) * 0.05
+        self.Kp = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+        self.Ki = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1]) * 0.0
+        self.Kd = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1]) * 10.0
 
         # PID error storage
         self.integral_error = np.zeros(6)
@@ -205,11 +205,7 @@ class SimulatedRobot:
         error_pos = ee_target_pos - ee_pos
         error = np.hstack([error_pos, error_rot])
 
-        # 여기서 PID 적용
-        dt = self.m.opt.timestep  # 시뮬레이션 timestep
-        control_signal = self._apply_pid(error, dt)
-
-        dq = jac[:5, :5].T @ np.linalg.solve(jac[:5, :5] @ jac[:5, :5].T + diag, control_signal[:5])
+        dq = jac[:5, :5].T @ np.linalg.solve(jac[:5, :5] @ jac[:5, :5].T + diag, error[:5])
 
         q = self.d.qpos.copy()
         mujoco.mj_integratePos(self.m, q, dq, integration_dt)
@@ -235,7 +231,7 @@ class SimulatedRobot:
         error_quat = np.zeros(4)
 
         diag = 1e-4 * np.identity(4)
-        integration_dt = 1.0
+        integration_dt = 1.0 / 2
 
         jacp = np.zeros((3, self.m.nv))
         jacr = np.zeros((3, self.m.nv))
@@ -252,7 +248,11 @@ class SimulatedRobot:
         error_pos = ee_target_pos - ee_pos
         error = np.hstack([error_pos, error_rot])
         
-        dq = jac[:4, :4].T @ np.linalg.solve(jac[:4, :4] @ jac[:4, :4].T + diag, error[:4])
+        # 여기서 PID 적용
+        dt = self.m.opt.timestep  # 시뮬레이션 timestep
+        control_signal = self._apply_pid(error, dt)
+        
+        dq = jac[:4, :4].T @ np.linalg.solve(jac[:4, :4] @ jac[:4, :4].T + diag, control_signal[:4])
 
         q = self.d.qpos.copy()[:4]
         print(q.shape, dq.shape, self.m)

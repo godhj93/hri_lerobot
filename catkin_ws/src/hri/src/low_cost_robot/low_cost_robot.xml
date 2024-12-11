@@ -65,13 +65,13 @@
                                     <geom type="box" condim="3" friction="0.7" mass="0.01" solimp="0.95 0.99 0.001" solref="0.004 1" name="static_finger_pad" size="0.006 0.006 0.006" pos="0.0135 0.07 0.0" priority="1" rgba="0 0 0.8 0"/>
                                 </body>
 
-                                <body name="joint6" pos="0 0 0">
+                                <!-- <body name="joint6" pos="0 0 0">
                                     <joint pos="-0.009 0.0165 0" name="joint6" class="joint6"/>
                                     <geom pos="0 -0.125 -0.163" type="mesh" name="joint6" mesh="gripper-moving-part-dumb_v2_1" rgba="0.1 0.1 0.1 1" contype="0" conaffinity="0"/>
                                     <body name="joint6-pad">
                                         <geom type="box" condim="3" friction="0.7" mass="0.01" solimp="0.95 0.99 0.001" solref="0.004 1" name="moving_finger_pad" size="0.006 0.006 0.006" pos="0 0.07 0" euler="0 0 -0.3" priority="1" rgba="0 0 0.8 0"/>
                                     </body>
-                                </body>
+                                </body> -->
                             </body>
                         </body>
                     </body>
@@ -85,6 +85,6 @@
         <position class="joint3" name="joint3" joint="joint3"/>
         <position class="joint4" name="joint4" joint="joint4"/>
         <position class="joint5" name="joint5" joint="joint5"/>
-        <position class="joint6" name="joint6" joint="joint6"/>
+        <!-- <position class="joint6" name="joint6" joint="joint6"/> -->
     </actuator>
 </mujoco>

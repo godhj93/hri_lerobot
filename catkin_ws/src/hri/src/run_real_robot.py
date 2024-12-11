@@ -21,7 +21,7 @@ from utils import radian2pwm, pwm2radian, initialize_real_robot, clock
 
 
 # printing frequency
-printing_freq = 500
+printing_freq = 1000//2
 last_printed_time = 0
 
 # Global variable to handle shutdown
@@ -34,8 +34,10 @@ prev_reached_time = 0
 not_reached_duration = 0
 let_it_go_thre = 1.0
 
-DRAWING_Z = 0.07
-DRAWING_POINT_DIST = 0.001
+DRAWING_Z = 0.051 # This should be same as 'Z_MIN_BOUND'
+# MOVING_Z = 0.08 # This should be same as 'Z_MAX_BOUND'
+DRAWING_POINT_DIST = 0.05 # 5cm
+INTERPOLATING_NUM = 10
 
 def signal_handler(signum, frame):
     global shutdown_flag
@@ -51,38 +53,38 @@ def callback(data):
 
 def callback(data):
     
-    robot.target_ee_position = np.array(data.data)
+    # robot.target_ee_position = np.array(data.data)
     '''Original Code'''
-    # global target_queue, robot
+    global target_queue, robot
     
-    # # 새로 받은 데이터
-    # new_point = np.array(data.data)
+    # 새로 받은 데이터
+    new_point = np.array(data.data)
 
-    # # 큐의 마지막 포인트 가져오기
-    # if not target_queue.empty():
-    #     last_point = target_queue.queue[-1]
-    # else:
-    #     # if robot == None: return
-    #     try:
-    #         last_point = robot.target_ee_position
-    #     except:
-    #         return
+    # 큐의 마지막 포인트 가져오기
+    if not target_queue.empty():
+        last_point = target_queue.queue[-1]
+    else:
+        # if robot == None: return
+        try:
+            last_point = robot.target_ee_position
+        except:
+            return
 
-    # # 두 점 사이의 거리 계산
-    # distance = np.linalg.norm(new_point - last_point)
+    # 두 점 사이의 거리 계산
+    distance = np.linalg.norm(new_point - last_point)
 
-    # if distance > DRAWING_POINT_DIST:
-    #     # 두 점 사이를 짧은 간격으로 보간
-    #     num_interpolated_points = int(np.ceil(distance / DRAWING_POINT_DIST))
-    #     print(num_interpolated_points)
-    #     interpolated_points = np.linspace(last_point, new_point, num_interpolated_points, endpoint=False)
-    #     # 보간된 점들을 큐에 추가
-    #     for point in interpolated_points[1:]:  # 첫 점은 이미 큐에 있으므로 제외
-    #         target_queue.put(point)
-    #         print(f"Interpolated point added to queue: {point}")
+    if distance > DRAWING_POINT_DIST:
+        # 두 점 사이를 짧은 간격으로 보간
+        num_interpolated_points = int(np.ceil(distance / DRAWING_POINT_DIST))
+        print(num_interpolated_points)
+        interpolated_points = np.linspace(last_point, new_point, num_interpolated_points, endpoint=False)
+        # 보간된 점들을 큐에 추가
+        for point in interpolated_points[1:]:  # 첫 점은 이미 큐에 있으므로 제외
+            target_queue.put(point)
+            print(f"Interpolated point added to queue: {point}")
 
-    # target_queue.put(new_point)
-    # print(f"New target added to queue: {new_point}")
+    target_queue.put(new_point)
+    print(f"New target added to queue: {new_point}")
 
 if __name__ == '__main__':
     last_printed_time = time.time()
@@ -118,12 +120,30 @@ if __name__ == '__main__':
     trajectory_marker = create_marker_traj()
     drawing_marker = create_marker_traj()
 
-    # Initialize target position
-    robot.target_ee_position = np.array([0.0, 0.3, 0.1])  # 초기 목표 위치
-
     # Initialize real robot
     real_robot = initialize_real_robot(world)
+
+    '''DOING SOMETHING'''
+    # Initialize target position
+    robot.target_ee_position = np.array([0.0, 0.3, 0.15])
+    initialized_flag = False
+    # robot.target_ee_position = np.array([0.0, 0.3, 0.1])  # 초기 목표 위치
+    # init_pos = np.array([0.0, 0.3, 0.1])  # 초기 목표 위치
+
+    # real_robot._set_position_control()
+    # real_robot._enable_torque()
+    # # target_pwm = degree2pwm(np.array([0, 0, 0, 45]))
+    # target_pwm = radian2pwm(np.array(target_radian[:4]))
+    # current_pwm = real_robot.read_position()
     
+    # smooth_mover = np.linspace(current_pwm, target_pwm, 1000//4)
+    # step_start = time.time()
+    
+    # for pwm in smooth_mover:
+    #     real_robot.set_goal_pos([int(p) for p in pwm])
+    #     step_start = clock(step_start, world)
+    '''DOING SOMETHING'''
+
     with mujoco.viewer.launch_passive(world, data) as viewer:
         try:
             while viewer.is_running() and not shutdown_flag:
@@ -162,7 +182,7 @@ if __name__ == '__main__':
                 trajectory_marker.color.a = 1.0
                 joint_6_marker_pub.publish(trajectory_marker)
 
-                if point.z < DRAWING_Z:
+                if point.z < DRAWING_Z * 1.001:
                     drawing_marker.points.append(point)
                     drawing_marker.scale.x = 0.001
                     drawing_marker.scale.y = 0.001
@@ -171,7 +191,7 @@ if __name__ == '__main__':
                     drawing_marker.color.g = 1.0
                     drawing_marker.color.b = 0.0
                     drawing_marker.color.a = 1.0
-                drawing_marker_pub.publish(drawing_marker)
+                    drawing_marker_pub.publish(drawing_marker)
 
                 # Print out current status
                 if time.time() > last_printed_time + 1/printing_freq:
@@ -203,7 +223,23 @@ if __name__ == '__main__':
                 target_pwm = radian2pwm(np.array(target_radian[:4]))
                 current_pwm = real_robot.read_position()
                 
-                smooth_mover = np.linspace(current_pwm, target_pwm, 2000)
+                if initialized_flag == False: 
+                    smooth_mover = np.linspace(current_pwm, target_pwm, 1000)
+                    print("initalized")
+                    initialized_flag = True
+                else:
+                    if robot.target_ee_position[-1] > DRAWING_Z * 1.001:
+                        smooth_mover = np.linspace(current_pwm, target_pwm, 1000)
+                        z_up_flag = True
+                        print(colored(f"robot pos: {robot.target_ee_position[-1]}, smooth mover : {2000}", 'green'))
+                    elif z_up_flag:
+                        smooth_mover = np.linspace(current_pwm, target_pwm, 1000)
+                        z_up_flag = False
+                        print(colored(f"smooth mover : {1000}", 'blue'))
+                    else:
+                        smooth_mover = np.linspace(current_pwm, target_pwm, INTERPOLATING_NUM)
+                        print(colored(f"smooth mover : {INTERPOLATING_NUM}", 'red'))
+
                 step_start = time.time()
                 
                 for pwm in smooth_mover:
